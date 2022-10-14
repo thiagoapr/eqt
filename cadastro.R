@@ -52,9 +52,13 @@ uf <- c('al', 'ma', 'pa', 'pi', 'rs')
 
 cad <- NULL
 
+i <- 1
+
 for(i in (1:length(uf))){
 
-  cad0 <- read.csv(paste0('Desagregado/Data/Raw/Cadastro/',
+  # Base de cadastro selecionado
+  
+  cad0 <- read.csv(paste0('Desagregado/Data/Raw/CPF/Cadastro/',
                           'dados_cadastrais_', uf[i], '.csv'))
   
   cad0 <- cad0 %>%
@@ -63,8 +67,22 @@ for(i in (1:length(uf))){
   cad0 <- cad0 %>%
     select(UF, CONTA_CONTRATO, NIVEL_TENSAO, TARIFA_SOCIAL, MoveIn)
   
-  cad <- rbind(cad, cad0)
 
+  # Base de cadastrao completo (recupera CEP)
+  
+  cad1 <- read.csv(paste0('Desagregado/Data/Raw/Cadastro_completo/csv/',
+                          'dados_cadastrais_', uf[i], '.csv'))
+  
+  cad1 <- cad1 %>% 
+    select(CONTA_CONTRATO, CEP, DATA_PRIMEIRA_FATURA)
+  
+  # Merge
+  
+  cad0 <- cad0 %>%
+    left_join(cad1, by = 'CONTA_CONTRATO')
+  
+  cad <- rbind(cad, cad0)
+  
 }
 
 # Tratamento
@@ -74,6 +92,11 @@ cad <- cad %>%
   mutate(NivelTensao = as.integer(NivelTensao)) %>%
   select(-TensaoUnidade)
 
+cad <- cad %>%
+  mutate(PrimeiraFatura = as.numeric(substr(DATA_PRIMEIRA_FATURA, 7, 10)) * 100 +
+           as.numeric(substr(DATA_PRIMEIRA_FATURA, 4, 5))) %>%
+  select(-DATA_PRIMEIRA_FATURA)
+
 # ------------------------------------------------------------------------------
 
 # Merge painel e cadastro
@@ -82,7 +105,7 @@ df <- df %>%
   left_join(cad, by = c('UF', 'CONTA_CONTRATO'))
   
 df <- df %>%
-  filter(Data >= MoveIn)
+  filter(Data >= PrimeiraFatura)
   
 saveRDS(df, 'Desagregado/Data/Temp/cadastro.RDS')
   
